@@ -392,7 +392,7 @@ def dispatch(query: str) -> str:
             requirement = (q[:m.start()] + q[m.end():]).strip()
             return handle_pubg_stats(player_name, requirement)
     # Unrecognised — casual chat
-    return ai_reply(query, max_tokens=40)
+    return ai_reply(f"{query}\n（请用一句话回复，不超过50字）", max_tokens=80)
 
 
 
