@@ -1,0 +1,15 @@
+[Unit]
+Description=WeChat Auto Re-Login Monitor
+After=agent-wechat.service network.target
+Requires=agent-wechat.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/wechat-auto-relogin.py
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

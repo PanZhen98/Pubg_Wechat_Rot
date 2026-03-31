@@ -1,0 +1,16 @@
+# Runtime state
+last_report_date.txt
+registered_players.json
+players_*.json
+
+# Logs
+*.log
+
+# Auth tokens
+auth-token
+token
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

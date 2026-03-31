@@ -1,0 +1,16 @@
+[Unit]
+Description=Agent WeChat Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/start-agent-wechat.sh
+ExecStop=docker stop agent-wechat
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

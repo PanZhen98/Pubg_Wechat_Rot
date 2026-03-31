@@ -1,0 +1,16 @@
+[Unit]
+Description=WeChat AI Bot
+After=network.target agent-wechat.service
+Requires=agent-wechat.service
+
+[Service]
+Type=simple
+ExecStartPre=/opt/wait-for-chats.sh
+ExecStart=/usr/bin/python3 /opt/wechat_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/tmp/bot.log
+StandardError=append:/tmp/bot.log
+
+[Install]
+WantedBy=multi-user.target
