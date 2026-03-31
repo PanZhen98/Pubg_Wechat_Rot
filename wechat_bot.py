@@ -156,57 +156,113 @@ def handle_pubg_stats(player_name, requirement=""):
     )
 
 
-def handle_pubg_evaluation(player_name: str) -> str:
-    """Fetch today's + lifetime stats and ask AI to evaluate with tiered tone."""
+_EVAL_TIERS = {
+    "daily": (
+        "夯（KD≥3或吃鸡率≥40%）：极度傲娇，勉强承认很强\n"
+        "顶级（KD 2~3或吃鸡率20~40%）：傲娇，表面嫌弃实则认可\n"
+        "人上人（KD 1~2）：勉强及格，轻微嘲讽\n"
+        "npc（KD 0.6~1）：强烈嘲讽\n"
+        "拉完了（KD≤0.6或0吃鸡且0击杀）：极限羞辱，重点嘲讽KD低"
+    ),
+    "season": (
+        "夯（KD≥2.5或吃鸡率≥20%）：极度傲娇，勉强承认很强\n"
+        "顶级（KD 1.5~2.5或吃鸡率10~20%）：傲娇，表面嫌弃实则认可\n"
+        "人上人（KD 1~1.5）：勉强及格，轻微嘲讽\n"
+        "npc（KD 0.6~1）：强烈嘲讽\n"
+        "拉完了（KD≤0.6或0吃鸡且总击杀<10）：极限羞辱，重点嘲讽KD低"
+    ),
+    "lifetime": (
+        "夯（KD≥2或吃鸡率≥10%）：极度傲娇，勉强承认很强\n"
+        "顶级（KD 1.5~2或吃鸡率5~10%）：傲娇，表面嫌弃实则认可\n"
+        "人上人（KD 1~1.5）：勉强及格，轻微嘲讽\n"
+        "npc（KD 0.6~1）：强烈嘲讽\n"
+        "拉完了（KD≤0.6或总场数<50且0吃鸡）：极限羞辱，重点嘲讽KD低"
+    ),
+}
+
+
+def handle_pubg_evaluation(player_name: str, requirement: str = "") -> str:
+    """Fetch stats and ask AI to evaluate with tiered tone."""
     client = PubgClient()
-    try:
-        stats = client.get_stats_for_date(player_name, shard=PUBG_SHARD)
-    except ValueError as e:
-        return str(e)
-    except Exception as e:
-        log.error(f"evaluation fetch error: {e}")
-        return "查不到数据，没法评价"
-    if not stats:
-        return f"{player_name} 今天根本没上线，评价个寂寞"
+    req = requirement
 
-    # Lifetime boost check
-    lifetime_boost_avg = 0.0
-    try:
-        lt = client.get_lifetime_stats(player_name, shard=PUBG_SHARD)
-        sq = lt["modes"].get("squad", {})
-        lt_rounds = sq.get("roundsPlayed", 0)
-        lt_boosts = sq.get("boosts", 0)
-        if lt_rounds > 0:
-            lifetime_boost_avg = round(lt_boosts / lt_rounds, 1)
-    except Exception:
-        pass
+    # Determine evaluation type
+    if any(k in req for k in ["生涯", "lifetime"]):
+        eval_type = "lifetime"
+    elif any(k in req for k in ["赛季", "season", "本赛季"]):
+        eval_type = "season"
+    else:
+        eval_type = "daily"
 
-    n = stats["games"]
-    wins = stats["wins"]
-    kd = stats["kd_ratio"]
-    avg_dmg = stats["avg_damage"]
-    win_rate = round(wins / n * 100) if n else 0
-    daily_boost_avg = round(stats.get("total_boosts", 0) / n, 1) if n else 0
+    if eval_type == "daily":
+        target_date = _parse_target_date(req)
+        try:
+            stats = client.get_stats_for_date(player_name, target_date, shard=PUBG_SHARD)
+        except ValueError as e:
+            return str(e)
+        except Exception as e:
+            log.error(f"evaluation fetch error: {e}")
+            return "查不到数据，没法评价"
+        date_label = "昨天" if any(k in req for k in ["昨", "昨日", "昨天"]) else "今天"
+        if not stats:
+            return f"{player_name} {date_label}根本没上线，评价个寂寞"
+        n = stats["games"]
+        wins = stats["wins"]
+        kd = stats["kd_ratio"]
+        avg_dmg = stats["avg_damage"]
+        win_rate = round(wins / n * 100) if n else 0
+        kills = stats["total_kills"]
+        boost_avg = round(stats.get("total_boosts", 0) / n, 1) if n else 0
+        period = f"{date_label}"
+        data_desc = f"出战{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{kills}"
+        boost_note = f"场均喝罐{boost_avg}罐（远超正常水平）。" if boost_avg > 4 else ""
+        # Also check lifetime boost
+        try:
+            lt = client.get_lifetime_stats(player_name, shard=PUBG_SHARD)
+            sq = lt["modes"].get("squad", {})
+            lt_rounds = sq.get("roundsPlayed", 0)
+            if lt_rounds > 0:
+                lt_boost_avg = round(sq.get("boosts", 0) / lt_rounds, 1)
+                if lt_boost_avg > 5:
+                    boost_note += f"生涯场均喝罐{lt_boost_avg}罐（严重异常）。"
+        except Exception:
+            pass
 
-    boost_note = ""
-    if daily_boost_avg > 4:
-        boost_note += f"今日场均喝罐{daily_boost_avg}罐（远超正常水平）。"
-    if lifetime_boost_avg > 5:
-        boost_note += f"生涯场均喝罐{lifetime_boost_avg}罐（严重异常）。"
+    else:
+        try:
+            if eval_type == "season":
+                data = client.get_season_stats(player_name, shard=PUBG_SHARD)
+                period = "本赛季"
+            else:
+                data = client.get_lifetime_stats(player_name, shard=PUBG_SHARD)
+                period = "生涯"
+        except ValueError as e:
+            return str(e)
+        except Exception as e:
+            log.error(f"evaluation fetch error: {e}")
+            return "查不到数据，没法评价"
+        sq = data["modes"].get("squad", {})
+        n = sq.get("roundsPlayed", 0)
+        if n == 0:
+            return f"{player_name} {period}暂无四排记录，没法评价"
+        wins = sq.get("wins", 0)
+        kills = sq.get("kills", 0)
+        kd = round(kills / max(n - wins, 1), 2)
+        avg_dmg = round(sq.get("damageDealt", 0.0) / n, 1)
+        win_rate = round(wins / n * 100, 1)
+        boost_avg = round(sq.get("boosts", 0) / n, 1)
+        data_desc = f"四排{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{kills}"
+        boost_note = f"{period}场均喝罐{boost_avg}罐（严重异常）。" if boost_avg > 5 else ""
 
     prompt = (
-        f"玩家 {player_name} 今日PUBG战绩：\n"
-        f"出战{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{stats['total_kills']}。\n"
+        f"玩家 {player_name} {period}PUBG战绩：\n"
+        f"{data_desc}。\n"
         + (f"喝罐数据：{boost_note}\n" if boost_note else "")
-        + "\n请按以下档位评价，只输出评价内容，纯文本不超过45字：\n"
-        "S档（KD≥3或吃鸡率≥40%）：极度傲娇，勉强承认很强\n"
-        "A档（KD 2~3或吃鸡率20~40%）：傲娇，表面嫌弃实则认可\n"
-        "B档（KD 1~2）：勉强及格，轻微嘲讽\n"
-        "C档（KD<1）：强烈嘲讽\n"
-        "D档（0吃鸡且0击杀）：极限羞辱\n"
-        + ("另外，喝罐异常需在评价中附加一句嘲讽。\n" if boost_note else "")
+        + "\n请按以下档位评价，回复格式为两行：第一行只写档位名称，第二行写评价内容（不超过45字）：\n"
+        + _EVAL_TIERS[eval_type] + "\n"
+        + ("另外，喝罐异常需在第二行评价中附加一句嘲讽。\n" if boost_note else "")
     )
-    return ai_reply(prompt, max_tokens=100)
+    return ai_reply(prompt, max_tokens=120)
 
 
 def handle_register(player_name: str) -> str:
@@ -320,7 +376,8 @@ def dispatch(query: str) -> str:
     if "评价" in q:
         m_eval = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
         if m_eval:
-            return handle_pubg_evaluation(m_eval.group(1))
+            requirement = (q[:m_eval.start()] + q[m_eval.end():]).strip()
+            return handle_pubg_evaluation(m_eval.group(1), requirement)
     # PUBG ID anywhere in message (pure-ASCII, 3-24 chars)
     m = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
     if m:
