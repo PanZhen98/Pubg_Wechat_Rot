@@ -215,7 +215,7 @@ def handle_pubg_evaluation(player_name: str, requirement: str = "") -> str:
         boost_avg = round(stats.get("total_boosts", 0) / n, 1) if n else 0
         period = f"{date_label}"
         data_desc = f"出战{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{kills}"
-        boost_note = f"场均喝罐{boost_avg}罐（远超正常水平）。" if boost_avg > 4 else ""
+        boost_note = f"场均喝罐{boost_avg}罐（远超正常水平）。" if boost_avg > 3.5 else ""
         # Also check lifetime boost
         try:
             lt = client.get_lifetime_stats(player_name, shard=PUBG_SHARD)
@@ -223,7 +223,7 @@ def handle_pubg_evaluation(player_name: str, requirement: str = "") -> str:
             lt_rounds = sq.get("roundsPlayed", 0)
             if lt_rounds > 0:
                 lt_boost_avg = round(sq.get("boosts", 0) / lt_rounds, 1)
-                if lt_boost_avg > 5:
+                if lt_boost_avg > 4:
                     boost_note += f"生涯场均喝罐{lt_boost_avg}罐（严重异常）。"
         except Exception:
             pass
@@ -252,7 +252,7 @@ def handle_pubg_evaluation(player_name: str, requirement: str = "") -> str:
         win_rate = round(wins / n * 100, 1)
         boost_avg = round(sq.get("boosts", 0) / n, 1)
         data_desc = f"四排{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{kills}"
-        boost_note = f"{period}场均喝罐{boost_avg}罐（严重异常）。" if boost_avg > 5 else ""
+        boost_note = f"{period}场均喝罐{boost_avg}罐（严重异常）。" if boost_avg > 4 else ""
 
     prompt = (
         f"玩家 {player_name} {period}PUBG战绩：\n"
