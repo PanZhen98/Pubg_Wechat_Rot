@@ -156,6 +156,30 @@ def handle_pubg_stats(player_name, requirement=""):
     )
 
 
+def handle_pubg_evaluation(player_name: str) -> str:
+    """Fetch today's stats and ask AI to evaluate with dynamic tone."""
+    client = PubgClient()
+    try:
+        stats = client.get_stats_for_date(player_name, shard=PUBG_SHARD)
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        log.error(f"evaluation fetch error: {e}")
+        return "查不到数据，没法评价"
+    if not stats:
+        return f"{player_name} 今天根本没上线，评价个寂寞"
+    prompt = (
+        f"玩家 {player_name} 今日PUBG战绩：\n"
+        f"出战{stats['games']}场，吃鸡{stats['wins']}次，KD {stats['kd_ratio']}，"
+        f"场均伤害{stats['avg_damage']}，总击杀{stats['total_kills']}。\n\n"
+        "请根据数据水平评价这名玩家：\n"
+        "- 表现好（KD>2或吃鸡率>30%或场均伤害>400）→ 用傲娇语气，表面嫌弃实则认可\n"
+        "- 表现差 → 用嘲讽攻击语气，毒舌但有趣\n"
+        "要求：纯文本，不超过40字，直接输出评价内容。"
+    )
+    return ai_reply(prompt, max_tokens=80)
+
+
 def handle_register(player_name: str) -> str:
     """Validate player exists via PUBG API then save to registry."""
     try:
@@ -263,6 +287,11 @@ def dispatch(query: str) -> str:
     # Help / usage questions
     if any(kw in q for kw in _HELP_KEYWORDS):
         return _HELP_MSG
+    # Evaluation: 消息含"评价" + 玩家ID
+    if "评价" in q:
+        m_eval = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
+        if m_eval:
+            return handle_pubg_evaluation(m_eval.group(1))
     # PUBG ID anywhere in message (pure-ASCII, 3-24 chars)
     m = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
     if m:
