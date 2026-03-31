@@ -391,8 +391,8 @@ def dispatch(query: str) -> str:
             player_name = m.group(1)
             requirement = (q[:m.start()] + q[m.end():]).strip()
             return handle_pubg_stats(player_name, requirement)
-    # Unrecognised — casual chat
-    return ai_reply(f"{query}\n（请用一句话回复，不超过50字）", max_tokens=80)
+    # Unrecognised — fixed reply
+    return "我只能用来查询战绩，评价战绩，登记ID参加每日评比哦"
 
 
 
