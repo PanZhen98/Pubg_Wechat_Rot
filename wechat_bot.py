@@ -73,7 +73,7 @@ def agent_send(chat_id, text, token):
     log.info(f"[SENT] {chat_id}: {text[:80]}")
 
 
-def ai_reply(text):
+def ai_reply(text, max_tokens=500):
     messages = [
         {"role": "system", "content": SYSTEM_MSG},
         {"role": "user", "content": text}
@@ -84,7 +84,7 @@ def ai_reply(text):
             "Authorization": f"Bearer {AI_KEY}",
             "Content-Type": "application/json"
         },
-        json={"model": AI_MODEL, "messages": messages, "max_tokens": 500},
+        json={"model": AI_MODEL, "messages": messages, "max_tokens": max_tokens},
         timeout=30
     )
     r.raise_for_status()
@@ -269,8 +269,8 @@ def dispatch(query: str) -> str:
         player_name = m.group(1)
         requirement = (q[:m.start()] + q[m.end():]).strip()
         return handle_pubg_stats(player_name, requirement)
-    # Unrecognised — self-introduction
-    return "我是战地助手，专为 PUBG 战绩服务。\n@我 加玩家ID 可查战绩，@我 加\"帮助\" 看全部功能。"
+    # Unrecognised — casual chat
+    return ai_reply(query, max_tokens=60)
 
 
 
