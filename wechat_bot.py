@@ -157,7 +157,7 @@ def handle_pubg_stats(player_name, requirement=""):
 
 
 def handle_pubg_evaluation(player_name: str) -> str:
-    """Fetch today's stats and ask AI to evaluate with dynamic tone."""
+    """Fetch today's + lifetime stats and ask AI to evaluate with tiered tone."""
     client = PubgClient()
     try:
         stats = client.get_stats_for_date(player_name, shard=PUBG_SHARD)
@@ -168,16 +168,45 @@ def handle_pubg_evaluation(player_name: str) -> str:
         return "查不到数据，没法评价"
     if not stats:
         return f"{player_name} 今天根本没上线，评价个寂寞"
+
+    # Lifetime boost check
+    lifetime_boost_avg = 0.0
+    try:
+        lt = client.get_lifetime_stats(player_name, shard=PUBG_SHARD)
+        sq = lt["modes"].get("squad", {})
+        lt_rounds = sq.get("roundsPlayed", 0)
+        lt_boosts = sq.get("boosts", 0)
+        if lt_rounds > 0:
+            lifetime_boost_avg = round(lt_boosts / lt_rounds, 1)
+    except Exception:
+        pass
+
+    n = stats["games"]
+    wins = stats["wins"]
+    kd = stats["kd_ratio"]
+    avg_dmg = stats["avg_damage"]
+    win_rate = round(wins / n * 100) if n else 0
+    daily_boost_avg = round(stats.get("total_boosts", 0) / n, 1) if n else 0
+
+    boost_note = ""
+    if daily_boost_avg > 4:
+        boost_note += f"今日场均喝罐{daily_boost_avg}罐（远超正常水平）。"
+    if lifetime_boost_avg > 5:
+        boost_note += f"生涯场均喝罐{lifetime_boost_avg}罐（严重异常）。"
+
     prompt = (
         f"玩家 {player_name} 今日PUBG战绩：\n"
-        f"出战{stats['games']}场，吃鸡{stats['wins']}次，KD {stats['kd_ratio']}，"
-        f"场均伤害{stats['avg_damage']}，总击杀{stats['total_kills']}。\n\n"
-        "请根据数据水平评价这名玩家：\n"
-        "- 表现好（KD>2或吃鸡率>30%或场均伤害>400）→ 用傲娇语气，表面嫌弃实则认可\n"
-        "- 表现差 → 用嘲讽攻击语气，毒舌但有趣\n"
-        "要求：纯文本，不超过40字，直接输出评价内容。"
+        f"出战{n}场，吃鸡{wins}次（吃鸡率{win_rate}%），KD {kd}，场均伤害{avg_dmg}，总击杀{stats['total_kills']}。\n"
+        + (f"喝罐数据：{boost_note}\n" if boost_note else "")
+        + "\n请按以下档位评价，只输出评价内容，纯文本不超过45字：\n"
+        "S档（KD≥3或吃鸡率≥40%）：极度傲娇，勉强承认很强\n"
+        "A档（KD 2~3或吃鸡率20~40%）：傲娇，表面嫌弃实则认可\n"
+        "B档（KD 1~2）：勉强及格，轻微嘲讽\n"
+        "C档（KD<1）：强烈嘲讽\n"
+        "D档（0吃鸡且0击杀）：极限羞辱\n"
+        + ("另外，喝罐异常需在评价中附加一句嘲讽。\n" if boost_note else "")
     )
-    return ai_reply(prompt, max_tokens=80)
+    return ai_reply(prompt, max_tokens=100)
 
 
 def handle_register(player_name: str) -> str:
