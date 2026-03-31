@@ -342,8 +342,14 @@ def _check_leave_event(msg: dict):
 
 _HELP_KEYWORDS = {
     "功能", "帮助", "help", "怎么用", "如何用", "用法",
-    "指令", "命令", "使用说明", "介绍", "干什么", "能做什么",
-    "有什么", "啥功能", "会什么",
+    "指令", "命令", "使用说明", "啥功能", "能做什么",
+}
+
+# Words that look like PUBG IDs but should never be treated as one
+_ID_BLOCKLIST = {
+    "pubg", "steam", "pc", "fps", "kd", "kill", "kills",
+    "game", "games", "squad", "duo", "solo", "rank", "season",
+    "http", "https", "www",
 }
 
 _HELP_MSG = (
@@ -375,18 +381,18 @@ def dispatch(query: str) -> str:
         return _HELP_MSG
     # Evaluation: 消息含"评价" + 玩家ID
     if "评价" in q:
-        m_eval = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
-        if m_eval:
-            requirement = (q[:m_eval.start()] + q[m_eval.end():]).strip()
-            return handle_pubg_evaluation(m_eval.group(1), requirement)
+        for m_eval in re.finditer(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q):
+            if m_eval.group(1).lower() not in _ID_BLOCKLIST:
+                requirement = (q[:m_eval.start()] + q[m_eval.end():]).strip()
+                return handle_pubg_evaluation(m_eval.group(1), requirement)
     # PUBG ID anywhere in message (pure-ASCII, 3-24 chars)
-    m = re.search(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q)
-    if m:
-        player_name = m.group(1)
-        requirement = (q[:m.start()] + q[m.end():]).strip()
-        return handle_pubg_stats(player_name, requirement)
+    for m in re.finditer(r"(?<![A-Za-z0-9_\-.])([A-Za-z0-9][A-Za-z0-9_\-.]{2,23})(?![A-Za-z0-9_\-.])", q):
+        if m.group(1).lower() not in _ID_BLOCKLIST:
+            player_name = m.group(1)
+            requirement = (q[:m.start()] + q[m.end():]).strip()
+            return handle_pubg_stats(player_name, requirement)
     # Unrecognised — casual chat
-    return ai_reply(query, max_tokens=60)
+    return ai_reply(query, max_tokens=40)
 
 
 
