@@ -269,8 +269,8 @@ def dispatch(query: str) -> str:
         player_name = m.group(1)
         requirement = (q[:m.start()] + q[m.end():]).strip()
         return handle_pubg_stats(player_name, requirement)
-    # Unrecognised — stay silent
-    return None
+    # Unrecognised — self-introduction
+    return "我是战地助手，专为 PUBG 战绩服务。\n@我 加玩家ID 可查战绩，@我 加\"帮助\" 看全部功能。"
 
 
 
