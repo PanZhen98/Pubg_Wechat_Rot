@@ -258,7 +258,7 @@ def handle_pubg_evaluation(player_name: str, requirement: str = "") -> str:
         f"玩家 {player_name} {period}PUBG战绩：\n"
         f"{data_desc}。\n"
         + (f"喝罐数据：{boost_note}\n" if boost_note else "")
-        + "\n请按以下档位评价，回复格式为两行：第一行只写档位名称，第二行写评价内容（不超过45字）：\n"
+        + f"\n请按以下档位评价，回复格式为两行：第一行写 '{player_name} 档位名称'，第二行写评价内容（不超过45字）：\n"
         + _EVAL_TIERS[eval_type] + "\n"
         + ("另外，喝罐异常需在第二行评价中附加一句嘲讽。\n" if boost_note else "")
     )
